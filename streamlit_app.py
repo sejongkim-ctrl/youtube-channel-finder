@@ -188,7 +188,8 @@ with col_demo:
             st.info(persona)
 
         conf = demo.get("confidence_level", "low")
-        st.caption(f"추정 신뢰도: {{'high':'높음','medium':'보통','low':'낮음'}.get(conf, conf)}")
+        conf_label = {"high": "높음", "medium": "보통", "low": "낮음"}.get(conf, conf)
+        st.caption(f"추정 신뢰도: {conf_label}")
     else:
         st.info("AI 분석 데이터 없음")
 
