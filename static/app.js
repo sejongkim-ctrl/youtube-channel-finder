@@ -279,6 +279,7 @@ function renderBrandFit(fit) {
 
     const topicScore = fit.topic_fit_score || '-';
     const behavioralScore = fit.behavioral_fit_score || '-';
+    const capabilityScore = fit.channel_capability_score || '-';
     const bestTiming = fit.best_timing || '';
 
     // verdict 섹션 (최상단)
@@ -295,12 +296,16 @@ function renderBrandFit(fit) {
         ${verdictHtml}
         <div class="fit-scores-dual">
             <div class="fit-score-axis">
-                <span class="axis-label">콘텐츠 주제</span>
-                <span class="axis-value">${topicScore}<small>/40</small></span>
+                <span class="axis-label">주제 적합</span>
+                <span class="axis-value">${topicScore}<small>/25</small></span>
             </div>
             <div class="fit-score-axis">
                 <span class="axis-label">행동 맥락</span>
-                <span class="axis-value">${behavioralScore}<small>/40</small></span>
+                <span class="axis-value">${behavioralScore}<small>/45</small></span>
+            </div>
+            <div class="fit-score-axis">
+                <span class="axis-label">채널 역량</span>
+                <span class="axis-value">${capabilityScore}<small>/30</small></span>
             </div>
         </div>
         ${bestTiming ? `<div class="fit-timing">최적 협업 시기: <strong>${escapeHtml(bestTiming)}</strong></div>` : ''}
@@ -349,18 +354,18 @@ function renderBrandFit(fit) {
 // ─── 강점/리스크 카테고리 렌더링 ───
 
 const STRENGTH_LABELS = {
-    audience_match: { label: '시청자 일치도', icon: '👥' },
-    trust_level: { label: '신뢰 관계', icon: '🤝' },
+    gift_motivation: { label: '선물 구매 동기', icon: '🎁' },
+    trust_transfer: { label: '신뢰 전이력', icon: '🤝' },
+    premium_fit: { label: '프리미엄 적합', icon: '💎' },
     content_synergy: { label: '콘텐츠 시너지', icon: '🎯' },
-    conversion_potential: { label: '전환 가능성', icon: '💎' },
-    cost_value: { label: '비용 가치', icon: '📊' },
+    seasonal_fit: { label: '시즌 활용도', icon: '📅' },
 };
 
 const RISK_LABELS = {
     audience_mismatch: { label: '시청자 불일치', icon: '👥' },
     content_conflict: { label: '콘텐츠 충돌', icon: '⚡' },
-    timing_dependency: { label: '시즌 의존도', icon: '📅' },
-    cost_efficiency: { label: '비용 효율', icon: '💰' },
+    premium_gap: { label: '프리미엄 괴리', icon: '💰' },
+    trust_risk: { label: '신뢰도 리스크', icon: '🔒' },
     competitor_exposure: { label: '경쟁 노출', icon: '🔍' },
 };
 

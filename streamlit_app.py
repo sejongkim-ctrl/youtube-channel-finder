@@ -578,10 +578,12 @@ if fit.get("score") is not None:
 
     topic = fit.get("topic_fit_score", "-")
     behav = fit.get("behavioral_fit_score", "-")
+    cap = fit.get("channel_capability_score", "-")
     fit_html += f"""
     <div class="axis-row">
-        <div class="axis-box"><span class="axis-label">콘텐츠 주제</span><span class="axis-val">{topic}<small>/40</small></span></div>
-        <div class="axis-box"><span class="axis-label">행동 맥락</span><span class="axis-val">{behav}<small>/40</small></span></div>
+        <div class="axis-box"><span class="axis-label">주제 적합</span><span class="axis-val">{topic}<small>/25</small></span></div>
+        <div class="axis-box"><span class="axis-label">행동 맥락</span><span class="axis-val">{behav}<small>/45</small></span></div>
+        <div class="axis-box"><span class="axis-label">채널 역량</span><span class="axis-val">{cap}<small>/30</small></span></div>
     </div>"""
 
     timing = fit.get("best_timing", "")
@@ -595,11 +597,11 @@ st.markdown(f'<div class="grid-2">{demo_html}{fit_html}</div>', unsafe_allow_htm
 
 # ─── 강점 / 리스크 ───
 if fit.get("score") is not None:
-    SL = {"audience_match": ("👥", "시청자 일치도"), "trust_level": ("🤝", "신뢰 관계"),
-          "content_synergy": ("🎯", "콘텐츠 시너지"), "conversion_potential": ("💎", "전환 가능성"),
-          "cost_value": ("📊", "비용 가치")}
+    SL = {"gift_motivation": ("🎁", "선물 구매 동기"), "trust_transfer": ("🤝", "신뢰 전이력"),
+          "premium_fit": ("💎", "프리미엄 적합"), "content_synergy": ("🎯", "콘텐츠 시너지"),
+          "seasonal_fit": ("📅", "시즌 활용도")}
     RL = {"audience_mismatch": ("👥", "시청자 불일치"), "content_conflict": ("⚡", "콘텐츠 충돌"),
-          "timing_dependency": ("📅", "시즌 의존도"), "cost_efficiency": ("💰", "비용 효율"),
+          "premium_gap": ("💰", "프리미엄 괴리"), "trust_risk": ("🔒", "신뢰도 리스크"),
           "competitor_exposure": ("🔍", "경쟁 노출")}
 
     sr_html = '<div class="st-card"><div class="sr-grid"><div><div class="sr-col-title">강점</div>'
