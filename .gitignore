@@ -1,0 +1,9 @@
+.env
+__pycache__/
+*.pyc
+cache/*.json
+.DS_Store
+venv/
+*.json
+!package.json
+!render.yaml

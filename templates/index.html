@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Channel Finder</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <!-- 헤더 -->
+    <header class="header">
+        <div class="container">
+            <h1 class="logo">YouTube Channel Finder</h1>
+            <p class="subtitle">수(Soo) 브랜드 마케팅 협업 채널 분석 도구</p>
+            <div class="status-bar">
+                <span class="status-item {% if status.youtube_connected %}connected{% else %}disconnected{% endif %}">
+                    YouTube API {% if status.youtube_connected %}연결됨{% else %}미연결{% endif %}
+                </span>
+                <span class="status-item {% if status.gemini_connected %}connected{% else %}disconnected{% endif %}">
+                    Gemini AI {% if status.gemini_connected %}활성{% else %}비활성{% endif %}
+                </span>
+                <span class="status-item quota" id="quotaDisplay">
+                    Quota: <span id="quotaCount">{{ status.quota_used }}</span>/10,000
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- 검색 모드 탭 -->
+        <div class="tabs">
+            <button class="tab active" data-tab="search" onclick="switchTab('search')">키워드 검색</button>
+            <button class="tab" data-tab="analyze" onclick="switchTab('analyze')">URL 분석</button>
+        </div>
+
+        <!-- 키워드 검색 -->
+        <section id="searchPanel" class="panel active">
+            <div class="search-box">
+                <input type="text" id="searchKeyword" placeholder="채널 키워드를 입력하세요 (예: 건강, 한방, 웰니스)"
+                       onkeypress="if(event.key==='Enter')searchChannels()">
+                <button onclick="searchChannels()" id="searchBtn">검색</button>
+            </div>
+            <div class="presets">
+                {% for name, preset in presets.items() %}
+                <button class="preset-btn" onclick="searchPreset('{{ preset.keyword }}')">
+                    {{ preset.emoji }} {{ name }}
+                </button>
+                {% endfor %}
+            </div>
+        </section>
+
+        <!-- URL 분석 -->
+        <section id="analyzePanel" class="panel">
+            <div class="search-box">
+                <input type="text" id="channelUrl" placeholder="채널 URL 또는 @handle 입력 (예: https://youtube.com/@channelname)"
+                       onkeypress="if(event.key==='Enter')analyzeChannel()">
+                <button onclick="analyzeChannel()" id="analyzeBtn">분석</button>
+            </div>
+            <p class="hint">지원 형식: youtube.com/@handle, youtube.com/channel/UCxxxx, @handle</p>
+        </section>
+
+        <!-- 로딩 -->
+        <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+            <p id="loadingText">검색 중...</p>
+        </div>
+
+        <!-- 에러 -->
+        <div id="errorMsg" class="error-msg hidden"></div>
+
+        <!-- 검색 결과 -->
+        <section id="searchResults" class="results hidden">
+            <div class="results-header">
+                <h2>검색 결과 (<span id="resultCount">0</span>개)</h2>
+                <button class="export-btn" onclick="exportCsv()" id="exportBtn" disabled>CSV 내보내기</button>
+            </div>
+            <div id="channelCards" class="channel-cards"></div>
+        </section>
+
+        <!-- 상세 분석 결과 -->
+        <section id="analysisResult" class="analysis hidden">
+            <div class="analysis-header">
+                <h2 id="analysisTitle">채널 분석 결과</h2>
+                <span id="cacheIndicator" class="cache-badge hidden">캐시</span>
+                <button class="close-btn" onclick="closeAnalysis()">닫기</button>
+            </div>
+
+            <div class="analysis-grid">
+                <!-- 기본 정보 -->
+                <div class="analysis-card">
+                    <h3>기본 정보</h3>
+                    <div class="channel-profile">
+                        <img id="analysisThumbnail" src="" alt="" class="channel-avatar-lg">
+                        <div>
+                            <p class="stat-row"><span class="label">구독자</span><span id="aSubs" class="value"></span></p>
+                            <p class="stat-row"><span class="label">총 조회수</span><span id="aViews" class="value"></span></p>
+                            <p class="stat-row"><span class="label">영상 수</span><span id="aVideos" class="value"></span></p>
+                            <p class="stat-row"><span class="label">개설일</span><span id="aDate" class="value"></span></p>
+                            <p class="stat-row"><span class="label">국가</span><span id="aCountry" class="value"></span></p>
+                        </div>
+                    </div>
+                    <div class="engagement-stats" id="engagementStats"></div>
+                </div>
+
+                <!-- 인구통계 추정 -->
+                <div class="analysis-card">
+                    <h3>추정 인구통계</h3>
+                    <div id="demographicsContent">
+                        <p class="no-data">AI 분석 실행 후 표시됩니다</p>
+                    </div>
+                </div>
+
+                <!-- 브랜드 적합도 -->
+                <div class="analysis-card full-width">
+                    <h3>브랜드 적합도</h3>
+                    <div id="brandFitContent">
+                        <p class="no-data">AI 분석 실행 후 표시됩니다</p>
+                    </div>
+                </div>
+
+                <!-- 최근 영상 -->
+                <div class="analysis-card full-width">
+                    <h3>최근 영상 TOP 10</h3>
+                    <div id="recentVideos">
+                        <p class="no-data">분석 후 표시됩니다</p>
+                    </div>
+                </div>
+
+                <!-- 유사 채널 추천 -->
+                <div id="similarChannelsSection" class="analysis-card full-width hidden">
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>YouTube Channel Finder v1.0 | 수(Soo) 브랜드 마케팅팀</p>
+    </footer>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
