@@ -30,6 +30,7 @@ from config import (
     SUU_BRAND_CONTEXT,
     INFLUENCER_CONTEXT,
     YOUTUBE_CATEGORIES,
+    CATEGORY_BENCHMARKS,
 )
 
 load_dotenv(override=True)
@@ -411,10 +412,13 @@ class YouTubeAnalyzer:
     # ─── 댓글 수집 ───
 
     def _get_video_comments(self, video_ids, max_per_video=30):
-        """인기 영상의 상위 댓글 수집 (행동 맥락 분석용)"""
+        """인기 영상의 상위 댓글 수집 (행동 맥락 + 인구통계 분석용)
+
+        v3: 5개 영상으로 확대, 작성자 닉네임 추출 추가
+        """
         all_comments = []
-        # 조회수 높은 상위 3개 영상에서만 댓글 수집 (API 절약)
-        for vid in video_ids[:3]:
+        # 조회수 높은 상위 5개 영상에서 댓글 수집 (3→5 확대, +2 units)
+        for vid in video_ids[:5]:
             try:
                 response = (
                     self.youtube.commentThreads()
@@ -432,12 +436,14 @@ class YouTubeAnalyzer:
                 for item in response.get("items", []):
                     c = item["snippet"]["topLevelComment"]["snippet"]
                     text = c["textDisplay"].replace("\n", " ").strip()
+                    author = c.get("authorDisplayName", "").strip()
                     # 크리에이터 본인의 고정 댓글(광고 링크) 제외
                     if len(text) > 10 and not text.startswith("http"):
                         all_comments.append(
                             {
                                 "text": text[:200],
                                 "likes": c.get("likeCount", 0),
+                                "author": author,
                             }
                         )
             except Exception:
@@ -448,7 +454,7 @@ class YouTubeAnalyzer:
     # ─── AI 분석 ───
 
     def _run_ai_analysis(self, channel_data, recent_videos):
-        """Gemini로 인구통계 추정 + 브랜드 적합도 통합 분석 (v2: 댓글 포함)"""
+        """Gemini로 인구통계 추정 + 브랜드 적합도 통합 분석 (v3: 닉네임+벤치마크+어투)"""
         videos_summary = "\n".join(
             [
                 f"- [{v['category_name']}] {v['title']} (조회수: {v['view_display']}, 좋아요: {v['like_display']})"
@@ -456,7 +462,7 @@ class YouTubeAnalyzer:
             ]
         )
 
-        # 댓글 수집 (상위 3개 영상 × 30건)
+        # 댓글 수집 (상위 5개 영상 × 30건, v3 확대)
         video_ids = [v["video_id"] for v in recent_videos]
         comments = self._get_video_comments(video_ids)
         comments_summary = "\n".join(
@@ -465,6 +471,40 @@ class YouTubeAnalyzer:
                 for c in sorted(comments, key=lambda x: x["likes"], reverse=True)
             ]
         ) if comments else "(댓글 수집 불가)"
+
+        # v3: 댓글 작성자 닉네임 수집 (성별/연령 추론 단서)
+        author_names = list(dict.fromkeys(
+            c["author"] for c in comments if c.get("author")
+        ))
+        if author_names:
+            commenter_profiles = (
+                f"총 {len(author_names)}명 (중복 제거):\n"
+                + ", ".join(author_names[:80])
+            )
+        else:
+            commenter_profiles = "(댓글 작성자 정보 없음)"
+
+        # v3: 영상 카테고리 기반 벤치마크
+        category_counts = {}
+        for v in recent_videos:
+            cat = v.get("category_name", "Unknown")
+            category_counts[cat] = category_counts.get(cat, 0) + 1
+        primary_category = (
+            max(category_counts, key=category_counts.get)
+            if category_counts else "Unknown"
+        )
+        benchmark = CATEGORY_BENCHMARKS.get(primary_category, {})
+        if benchmark:
+            category_benchmark = (
+                f"주요 카테고리: {primary_category}\n"
+                f"- 업계 평균: {benchmark['typical_demographics']}\n"
+                f"- 참고: {benchmark['note']}"
+            )
+        else:
+            category_benchmark = (
+                f"주요 카테고리: {primary_category}\n"
+                "- 벤치마크 없음. 콘텐츠 기반으로 추정"
+            )
 
         prompt = COMBINED_ANALYSIS_PROMPT.format(
             brand_context=SUU_BRAND_CONTEXT,
@@ -478,6 +518,8 @@ class YouTubeAnalyzer:
             country=channel_data["country"],
             recent_videos_summary=videos_summary,
             comments_summary=comments_summary,
+            commenter_profiles=commenter_profiles,
+            category_benchmark=category_benchmark,
         )
 
         try:
