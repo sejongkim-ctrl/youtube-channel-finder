@@ -15,7 +15,7 @@ except Exception:
     pass  # 로컬 실행 시 .env 사용
 
 from youtube_analyzer import YouTubeAnalyzer
-from config import SEARCH_PRESETS
+from config import SEARCH_PRESETS, MIN_SUBSCRIBER_COUNT
 
 # ─── 페이지 설정 ───
 st.set_page_config(
@@ -413,6 +413,7 @@ st.markdown(f"""
     <span class="st-status-item {yt_cls}">{yt_txt}</span>
     <span class="st-status-item {gm_cls}">{gm_txt}</span>
     <span class="st-status-item info">Quota: {status['quota_used']}/10,000</span>
+    <span class="st-status-item info">필터: 구독자 {MIN_SUBSCRIBER_COUNT:,}+ | v2.4</span>
 </div>
 """, unsafe_allow_html=True)
 
