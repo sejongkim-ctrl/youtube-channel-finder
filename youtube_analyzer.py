@@ -94,6 +94,8 @@ class YouTubeAnalyzer:
             return {"error": "YouTube API 키가 설정되지 않았습니다."}
 
         max_results = max_results or MAX_SEARCH_RESULTS
+        # over-fetch: 구독자 필터 후에도 충분한 결과를 확보하기 위해 3배 요청
+        fetch_count = min(max_results * 3, 50)
 
         try:
             # search.list (100 units)
@@ -103,7 +105,7 @@ class YouTubeAnalyzer:
                     q=keyword,
                     type="channel",
                     part="snippet",
-                    maxResults=max_results,
+                    maxResults=fetch_count,
                     order="relevance",
                 )
                 .execute()
@@ -132,8 +134,14 @@ class YouTubeAnalyzer:
             channels = []
             for item in channels_response.get("items", []):
                 ch = self._parse_channel_data(item)
-                if ch["subscriber_count"] >= MIN_SUBSCRIBER_COUNT:
-                    channels.append(ch)
+                subs = ch["subscriber_count"]
+                if not isinstance(subs, int) or subs < MIN_SUBSCRIBER_COUNT:
+                    continue
+                channels.append(ch)
+
+            # 구독자 수 내림차순 정렬 후 max_results개 반환
+            channels.sort(key=lambda c: c["subscriber_count"], reverse=True)
+            channels = channels[:max_results]
 
             return {"channels": channels, "total": len(channels)}
 
