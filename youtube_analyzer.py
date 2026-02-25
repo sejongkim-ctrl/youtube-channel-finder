@@ -20,6 +20,7 @@ from config import (
     YOUTUBE_API_VERSION,
     MAX_SEARCH_RESULTS,
     MAX_RECENT_VIDEOS,
+    MIN_SUBSCRIBER_COUNT,
     GEMINI_MODEL,
     GEMINI_FALLBACK_MODEL,
     GEMINI_TEMPERATURE,
@@ -130,7 +131,9 @@ class YouTubeAnalyzer:
 
             channels = []
             for item in channels_response.get("items", []):
-                channels.append(self._parse_channel_data(item))
+                ch = self._parse_channel_data(item)
+                if ch["subscriber_count"] >= MIN_SUBSCRIBER_COUNT:
+                    channels.append(ch)
 
             return {"channels": channels, "total": len(channels)}
 
@@ -705,7 +708,7 @@ class YouTubeAnalyzer:
             # 3. 적합성 필터 + 스코어 정렬
             filtered = [
                 c for c in candidates
-                if c["subscriber_count"] >= 10000 and c["_fit_score"] > 0
+                if c["subscriber_count"] >= MIN_SUBSCRIBER_COUNT and c["_fit_score"] > 0
             ]
             filtered.sort(key=lambda x: x["_fit_score"], reverse=True)
 
