@@ -477,7 +477,7 @@ with st.sidebar:
     if channels:
         st.markdown(f'<div style="font-size:15px;font-weight:600;color:#e7e9ea;margin-bottom:10px;">검색 결과 ({len(channels)}개)</div>', unsafe_allow_html=True)
         for ch in channels:
-            is_active = sidebar_data and sidebar_data.get("channel_id") == ch["channel_id"]
+            is_active = bool(sidebar_data and sidebar_data.get("channel_id") == ch["channel_id"])
             border_c = "#1d9bf0" if is_active else "#2f3b47"
             bg_c = "#1e2a3a" if is_active else "#1a2332"
             thumb = ch.get("thumbnail", "")
