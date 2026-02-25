@@ -22,7 +22,7 @@ st.set_page_config(
     page_title="YouTube Channel Finder",
     page_icon="🔍",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
 # ─── 커스텀 CSS (Flask 스타일 재현) ───
@@ -104,6 +104,20 @@ details[data-testid="stExpander"] {
 /* 사이드바 */
 section[data-testid="stSidebar"] {
     background: #1a2332;
+}
+[data-testid="stSidebar"][aria-expanded="true"] {
+    min-width: 320px;
+    max-width: 340px;
+}
+[data-testid="stSidebar"] .block-container {
+    padding-top: 1rem;
+}
+/* 사이드바 내 버튼 작게 */
+[data-testid="stSidebar"] .stButton > button {
+    font-size: 12px;
+    padding: 4px 8px;
+    height: auto;
+    min-height: 32px;
 }
 
 /* ── 커스텀 컴포넌트 ── */
@@ -446,33 +460,6 @@ with tab_search:
                 st.session_state.search_results = result.get("channels", [])
         st.session_state.pop("_preset_kw", None)
 
-    # 검색 결과 (HTML 카드)
-    if st.session_state.search_results:
-        channels = st.session_state.search_results
-        st.markdown(f'<h2 style="font-size:18px;font-weight:600;color:#e7e9ea;margin:20px 0 14px;">검색 결과 ({len(channels)}개)</h2>', unsafe_allow_html=True)
-
-        for ch in channels:
-            thumb = ch.get("thumbnail", "")
-            title = esc(ch.get("title", ""))
-            subs = ch.get("subscriber_display", "")
-            vids = f"{ch.get('video_count', 0):,}"
-            country = ch.get("country", "N/A")
-            st.markdown(f"""
-            <div class="ch-card">
-                <img src="{thumb}" class="ch-avatar" onerror="this.style.display='none'">
-                <div class="ch-info">
-                    <div class="ch-name">{title}</div>
-                    <div class="ch-stats">
-                        <span>구독자 {subs}</span>
-                        <span>영상 {vids}개</span>
-                        <span>{country}</span>
-                    </div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            if st.button("분석", key=f"a_{ch['channel_id']}", type="secondary"):
-                run_analysis(ch["channel_id"])
-
 with tab_analyze:
     col_in, col_btn = st.columns([5, 1])
     ch_input = col_in.text_input("분석", placeholder="채널 URL 또는 @handle 입력", label_visibility="collapsed")
@@ -482,12 +469,51 @@ with tab_analyze:
             run_analysis(ch_input)
 
 
-# ─── 분석 결과 ───
+# ─── Sidebar: 검색 결과 리스트 ───
+with st.sidebar:
+    channels = st.session_state.search_results
+    sidebar_data = st.session_state.analysis_data
+
+    if channels:
+        st.markdown(f'<div style="font-size:15px;font-weight:600;color:#e7e9ea;margin-bottom:10px;">검색 결과 ({len(channels)}개)</div>', unsafe_allow_html=True)
+        for ch in channels:
+            is_active = sidebar_data and sidebar_data.get("channel_id") == ch["channel_id"]
+            border_c = "#1d9bf0" if is_active else "#2f3b47"
+            bg_c = "#1e2a3a" if is_active else "#1a2332"
+            thumb = ch.get("thumbnail", "")
+            title_t = esc(ch.get("title", ""))
+            subs_d = ch.get("subscriber_display", "")
+            vids_n = ch.get("video_count", 0)
+
+            st.markdown(f"""
+            <div style="display:flex;gap:10px;padding:10px;background:{bg_c};border:1px solid {border_c};border-radius:8px;margin-bottom:4px;align-items:center;">
+                <img src="{thumb}" style="width:36px;height:36px;border-radius:50%;flex-shrink:0;object-fit:cover;" onerror="this.style.display='none'">
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:13px;font-weight:600;color:#e7e9ea;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{title_t}</div>
+                    <div style="font-size:11px;color:#536471;">구독 {subs_d} · {vids_n:,}개</div>
+                </div>
+            </div>""", unsafe_allow_html=True)
+
+            if st.button("✓ 분석됨" if is_active else "분석", key=f"a_{ch['channel_id']}", disabled=is_active, use_container_width=True):
+                run_analysis(ch["channel_id"])
+
+    st.divider()
+    if sidebar_data:
+        csv = analyzer.export_csv([sidebar_data])
+        st.download_button("CSV 다운로드", csv, "youtube_channels.csv", "text/csv", use_container_width=True)
+    st.caption(f"Quota: {analyzer.get_status()['quota_used']} units")
+
+
+# ─── Main: 분석 결과 (상단 배치) ───
 data = st.session_state.analysis_data
 if not data:
+    if not st.session_state.search_results:
+        st.markdown('<p style="color:#536471;text-align:center;padding:60px 0;font-size:15px;">키워드 검색 또는 URL 입력으로 시작하세요</p>', unsafe_allow_html=True)
+    else:
+        st.markdown('<p style="color:#536471;text-align:center;padding:40px 0;font-size:15px;">← 좌측 검색 결과에서 채널을 선택하면 분석 결과가 여기에 표시됩니다</p>', unsafe_allow_html=True)
     st.stop()
 
-st.markdown('<hr style="border:1px solid #2f3b47;margin:24px 0 20px;">', unsafe_allow_html=True)
+st.markdown('<hr style="border:1px solid #2f3b47;margin:12px 0 16px;">', unsafe_allow_html=True)
 
 # 채널 제목
 cache_html = '<span style="font-size:11px;padding:2px 8px;background:#1a2332;border:1px solid #536471;border-radius:10px;color:#536471;margin-left:10px;">캐시</span>' if data.get("from_cache") else ""
@@ -701,12 +727,3 @@ if recent:
             </tr>"""
         vid_html += '</tbody></table>'
         st.markdown(vid_html, unsafe_allow_html=True)
-
-# ─── 사이드바: 내보내기 ───
-with st.sidebar:
-    st.header("내보내기")
-    if data:
-        csv = analyzer.export_csv([data])
-        st.download_button("CSV 다운로드", csv, "youtube_channels.csv", "text/csv", use_container_width=True)
-    st.divider()
-    st.caption(f"Quota: {analyzer.get_status()['quota_used']} units")
