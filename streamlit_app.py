@@ -622,6 +622,35 @@ fit_html += '</div>'
 
 st.markdown(f'<div class="grid-2">{demo_html}{fit_html}</div>', unsafe_allow_html=True)
 
+# ─── 채널 건강도 ───
+health = data.get("channel_health", {})
+if health.get("score") is not None and health.get("grade") != "N/A":
+    hg = health["grade"]
+    hs = health["score"]
+    health_html = f"""
+    <div class="st-card">
+        <h3>채널 건강도</h3>
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:14px;">
+            <span class="score-big gc-{hg}">{hs}</span>
+            <span class="grade-badge gc-{hg} gbg-{hg}">{hg}</span>
+        </div>
+        <div class="axis-row">
+            <div class="axis-box">
+                <span class="axis-label">업로드 빈도</span>
+                <span style="font-size:13px;color:#e7e9ea;">{esc(health.get('upload_frequency', '-'))}</span>
+            </div>
+            <div class="axis-box">
+                <span class="axis-label">숏폼 비율</span>
+                <span style="font-size:13px;color:#e7e9ea;">{esc(health.get('shorts_label', '-'))}</span>
+            </div>
+            <div class="axis-box">
+                <span class="axis-label">조회수 추세</span>
+                <span style="font-size:13px;color:#e7e9ea;">{esc(health.get('view_trend', '-'))}</span>
+            </div>
+        </div>
+    </div>"""
+    st.markdown(health_html, unsafe_allow_html=True)
+
 # ─── 강점 / 리스크 ───
 if fit.get("score") is not None:
     SL = {"gift_motivation": ("🎁", "선물 구매 동기"), "trust_transfer": ("🤝", "신뢰 전이력"),

@@ -216,6 +216,11 @@ class YouTubeAnalyzer:
                 channel_data, recent_videos
             )
 
+            # 채널 건강도 계산
+            channel_data["channel_health"] = self._calculate_channel_health(
+                recent_videos
+            )
+
             # 캐시 저장
             channel_data["analyzed_at"] = datetime.now().isoformat()
             channel_data["from_cache"] = False
@@ -375,12 +380,12 @@ class YouTubeAnalyzer:
             if not video_ids:
                 return []
 
-            # videos.list (1 unit)
+            # videos.list (1 unit) — contentDetails 추가로 duration 수집
             videos_response = (
                 self.youtube.videos()
                 .list(
                     id=",".join(video_ids),
-                    part="snippet,statistics",
+                    part="snippet,statistics,contentDetails",
                 )
                 .execute()
             )
@@ -392,6 +397,9 @@ class YouTubeAnalyzer:
                 v_stats = item.get("statistics", {})
                 view_count = int(v_stats.get("viewCount", 0))
                 like_count = int(v_stats.get("likeCount", 0))
+                duration_sec = self._parse_duration(
+                    item.get("contentDetails", {}).get("duration", "PT0S")
+                )
 
                 videos.append(
                     {
@@ -408,6 +416,7 @@ class YouTubeAnalyzer:
                         "view_display": self._format_number(view_count),
                         "like_count": like_count,
                         "like_display": self._format_number(like_count),
+                        "duration_seconds": duration_sec,
                         "thumbnail": v_snippet.get("thumbnails", {})
                         .get("medium", {})
                         .get("url", ""),
@@ -637,6 +646,138 @@ class YouTubeAnalyzer:
         if num >= 1_000:
             return f"{num / 1_000:.1f}천"
         return str(num)
+
+    @staticmethod
+    def _parse_duration(iso_duration):
+        """ISO 8601 duration (PT1H2M30S) → 초 단위 변환"""
+        m = re.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", iso_duration or "")
+        if not m:
+            return 0
+        h, mi, s = (int(x) if x else 0 for x in m.groups())
+        return h * 3600 + mi * 60 + s
+
+    def _calculate_channel_health(self, recent_videos):
+        """채널 건강도 점수 — 업로드 빈도 + 숏폼 비율 + 조회수 추세
+
+        Returns:
+            dict: score(0~100), grade(S/A/B/C/D), 세부 지표
+        """
+        if not recent_videos or len(recent_videos) < 2:
+            return {
+                "score": 0, "grade": "N/A",
+                "upload_frequency": "데이터 부족",
+                "days_since_last": None,
+                "shorts_ratio": 0,
+                "view_trend": "데이터 부족",
+                "view_trend_ratio": 0,
+            }
+
+        now = datetime.now()
+
+        # ── 1. 업로드 빈도 + 최근 활동일 ──
+        dates = []
+        for v in recent_videos:
+            try:
+                dt = datetime.fromisoformat(v["published_at"].replace("Z", "+00:00")).replace(tzinfo=None)
+                dates.append(dt)
+            except (ValueError, KeyError):
+                continue
+
+        dates.sort(reverse=True)
+        days_since_last = (now - dates[0]).days if dates else 999
+
+        if len(dates) >= 2:
+            span_days = max((dates[0] - dates[-1]).days, 1)
+            uploads_per_month = len(dates) / (span_days / 30)
+        else:
+            uploads_per_month = 0
+
+        # 업로드 빈도 점수 (40점 만점)
+        if days_since_last <= 7 and uploads_per_month >= 4:
+            freq_score = 40
+            freq_label = f"주 {uploads_per_month / 4:.1f}회 (활발)"
+        elif days_since_last <= 14 and uploads_per_month >= 2:
+            freq_score = 30
+            freq_label = f"월 {uploads_per_month:.0f}회 (양호)"
+        elif days_since_last <= 30:
+            freq_score = 20
+            freq_label = f"월 {uploads_per_month:.0f}회 (보통)"
+        elif days_since_last <= 90:
+            freq_score = 10
+            freq_label = f"마지막 업로드 {days_since_last}일 전 (느림)"
+        else:
+            freq_score = 0
+            freq_label = f"마지막 업로드 {days_since_last}일 전 (휴면)"
+
+        # ── 2. 숏폼 비율 ──
+        shorts_count = sum(
+            1 for v in recent_videos
+            if v.get("duration_seconds", 0) <= 60
+            or "#shorts" in v.get("title", "").lower()
+        )
+        shorts_ratio = shorts_count / len(recent_videos)
+
+        # 숏폼 비율 점수 (30점 만점) — 롱폼 비중 높을수록 유리
+        if shorts_ratio <= 0.2:
+            shorts_score = 30
+            shorts_label = f"{shorts_ratio:.0%} (롱폼 중심)"
+        elif shorts_ratio <= 0.5:
+            shorts_score = 20
+            shorts_label = f"{shorts_ratio:.0%} (혼합)"
+        elif shorts_ratio <= 0.7:
+            shorts_score = 10
+            shorts_label = f"{shorts_ratio:.0%} (숏폼 위주)"
+        else:
+            shorts_score = 0
+            shorts_label = f"{shorts_ratio:.0%} (숏폼 전용)"
+
+        # ── 3. 조회수 추세 ──
+        mid = len(recent_videos) // 2
+        recent_views = [v["view_count"] for v in recent_videos[:mid]]
+        older_views = [v["view_count"] for v in recent_videos[mid:]]
+
+        recent_avg = sum(recent_views) / len(recent_views) if recent_views else 0
+        older_avg = sum(older_views) / len(older_views) if older_views else 0
+        trend_ratio = recent_avg / older_avg if older_avg > 0 else 1.0
+
+        # 추세 점수 (30점 만점)
+        if trend_ratio >= 1.2:
+            trend_score = 30
+            trend_label = f"상승 (+{(trend_ratio - 1) * 100:.0f}%)"
+        elif trend_ratio >= 0.8:
+            trend_score = 20
+            trend_label = "유지"
+        elif trend_ratio >= 0.5:
+            trend_score = 10
+            trend_label = f"하락 ({(trend_ratio - 1) * 100:.0f}%)"
+        else:
+            trend_score = 0
+            trend_label = f"급락 ({(trend_ratio - 1) * 100:.0f}%)"
+
+        # ── 종합 ──
+        total = freq_score + shorts_score + trend_score
+        if total >= 80:
+            grade = "S"
+        elif total >= 60:
+            grade = "A"
+        elif total >= 40:
+            grade = "B"
+        elif total >= 20:
+            grade = "C"
+        else:
+            grade = "D"
+
+        return {
+            "score": total,
+            "grade": grade,
+            "upload_frequency": freq_label,
+            "uploads_per_month": round(uploads_per_month, 1),
+            "days_since_last": days_since_last,
+            "shorts_ratio": round(shorts_ratio, 2),
+            "shorts_label": shorts_label,
+            "view_trend": trend_label,
+            "view_trend_ratio": round(trend_ratio, 2),
+        }
 
     # ─── 유사 채널 검색 (적합성 필터링) ───
 
