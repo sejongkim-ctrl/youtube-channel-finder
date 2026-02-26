@@ -854,17 +854,18 @@ class YouTubeAnalyzer:
                 ch["_fit_score"] = self._score_channel_fit(ch)
                 candidates.append(ch)
 
-            # 3. 적합성 필터 + 스코어 정렬
+            # 3. 적합성 필터 + 스코어 정렬 (보통 이상만 — score >= 30)
             filtered = [
                 c for c in candidates
-                if c["subscriber_count"] >= MIN_SUBSCRIBER_COUNT and c["_fit_score"] > 0
+                if c["subscriber_count"] >= MIN_SUBSCRIBER_COUNT and c["_fit_score"] >= 30
             ]
             filtered.sort(key=lambda x: x["_fit_score"], reverse=True)
 
-            # 내부 스코어 제거 후 반환
+            # 추천 이유 + 힌트 부착 후 반환
             results = []
             for ch in filtered[:top_n]:
                 ch["fit_hint"] = self._fit_hint(ch["_fit_score"])
+                ch["fit_reason"] = self._get_fit_reason(ch)
                 del ch["_fit_score"]
                 results.append(ch)
 
@@ -912,6 +913,36 @@ class YouTubeAnalyzer:
         elif score >= 30:
             return "보통 적합성"
         return "낮은 적합성"
+
+    def _get_fit_reason(self, channel_data):
+        """채널이 추천된 이유를 간결한 문자열로 반환"""
+        reasons = []
+        text = f"{channel_data.get('description', '')} {channel_data.get('keywords', '')} {channel_data.get('title', '')}".lower()
+
+        # 매칭된 키워드 수집
+        matched_high = [kw for kw in self._FIT_KEYWORDS["high"] if kw in text]
+        matched_med = [kw for kw in self._FIT_KEYWORDS["medium"] if kw in text]
+        matched = matched_high + matched_med
+        if matched:
+            display = matched[:3]  # 최대 3개만 표시
+            reasons.append(f"'{', '.join(display)}' 키워드 매칭")
+
+        # 구독자 규모
+        subs = channel_data.get("subscriber_count", 0)
+        if 10000 <= subs < 100000:
+            reasons.append("마이크로 인플루언서")
+        elif 100000 <= subs < 500000:
+            reasons.append("미드티어 채널")
+        elif 500000 <= subs < 1000000:
+            reasons.append("대형 채널")
+        elif subs >= 1000000:
+            reasons.append("메가 채널")
+
+        # 한국 채널
+        if channel_data.get("country") == "KR":
+            reasons.append("한국 채널")
+
+        return " · ".join(reasons) if reasons else "키워드 기반 추천"
 
     def export_csv(self, channels_data):
         """채널 목록을 CSV 문자열로 변환"""

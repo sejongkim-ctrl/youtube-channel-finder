@@ -718,29 +718,34 @@ if fit.get("score") is not None:
     # 유사 채널 결과
     similar = st.session_state.similar_channels
     if similar and similar.get("channels"):
-        sim_html = f'<div class="st-card"><h3>유사 채널 추천 <span style="font-size:12px;color:#536471;font-weight:400;">{similar.get("pool_size", 0)}개 후보 중 상위 {len(similar["channels"])}개</span></h3>'
+        st.markdown(
+            f'<div class="st-card"><h3>유사 채널 추천 <span style="font-size:12px;color:#536471;font-weight:400;">'
+            f'{similar.get("pool_size", 0)}개 후보 중 상위 {len(similar["channels"])}개</span></h3></div>',
+            unsafe_allow_html=True,
+        )
         for ch in similar["channels"]:
             hint = ch.get("fit_hint", "")
             fit_cls = "fit-high" if "높은" in hint else "fit-medium" if "보통" in hint else "fit-low"
-            sim_html += f"""
-            <div class="sim-card">
-                <img src="{ch.get('thumbnail', '')}" class="sim-avatar" onerror="this.style.display='none'">
-                <div class="sim-info">
-                    <div class="sim-name">{esc(ch['title'])}</div>
-                    <div class="sim-stats">
-                        <span>{ch['subscriber_display']} 구독</span>
-                        <span>{ch['video_count']:,}개 영상</span>
-                        <span class="fit-badge {fit_cls}">{esc(hint)}</span>
-                    </div>
-                </div>
-            </div>"""
-        sim_html += '</div>'
-        st.markdown(sim_html, unsafe_allow_html=True)
+            reason = ch.get("fit_reason", "")
 
-        # 유사 채널 분석 버튼
-        for ch in similar["channels"]:
-            if st.button(f"분석: {ch['title'][:20]}", key=f"sim_{ch['channel_id']}"):
-                run_analysis(ch["channel_id"])
+            col_info, col_btn = st.columns([5, 1])
+            with col_info:
+                card_html = f"""<div class="sim-card" style="margin-bottom:0">
+                    <img src="{ch.get('thumbnail', '')}" class="sim-avatar" onerror="this.style.display='none'">
+                    <div class="sim-info">
+                        <div class="sim-name">{esc(ch['title'])}</div>
+                        <div class="sim-stats">
+                            <span>{ch['subscriber_display']} 구독</span>
+                            <span>{ch['video_count']:,}개 영상</span>
+                            <span class="fit-badge {fit_cls}">{esc(hint)}</span>
+                        </div>
+                        <div style="font-size:11px;color:#8b98a5;margin-top:2px">{esc(reason)}</div>
+                    </div>
+                </div>"""
+                st.markdown(card_html, unsafe_allow_html=True)
+            with col_btn:
+                if st.button("분석", key=f"sim_{ch['channel_id']}"):
+                    run_analysis(ch["channel_id"])
 
 # ─── 최근 영상 ───
 recent = data.get("recent_videos", [])
