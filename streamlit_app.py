@@ -750,15 +750,46 @@ if fit.get("score") is not None:
 # ─── 최근 영상 ───
 recent = data.get("recent_videos", [])
 if recent:
+
+    def _is_shorts(v):
+        return v.get("duration_seconds", 0) <= 60 or "#shorts" in v.get("title", "").lower()
+
+    shorts_list = [v for v in recent if _is_shorts(v)]
+    long_list = [v for v in recent if not _is_shorts(v)]
+
     with st.expander("최근 영상 TOP 10", expanded=False):
-        vid_html = '<table class="vid-table"><thead><tr><th>#</th><th>제목</th><th>카테고리</th><th style="text-align:right">조회수</th><th style="text-align:right">좋아요</th></tr></thead><tbody>'
-        for i, v in enumerate(recent):
-            vid_html += f"""<tr>
-                <td style="color:#536471">{i + 1}</td>
-                <td class="vid-title">{esc(v['title'])}</td>
-                <td style="color:#8b98a5;font-size:12px">{esc(v.get('category_name', ''))}</td>
-                <td class="vid-stat">{v.get('view_display', '')}</td>
-                <td class="vid-stat">{v.get('like_display', '')}</td>
-            </tr>"""
-        vid_html += '</tbody></table>'
-        st.markdown(vid_html, unsafe_allow_html=True)
+        filter_options = [f"전체 ({len(recent)})", f"롱폼 ({len(long_list)})", f"쇼츠 ({len(shorts_list)})"]
+        selected = st.radio("영상 유형", filter_options, horizontal=True, label_visibility="collapsed")
+
+        if "롱폼" in selected:
+            filtered_videos = long_list
+        elif "쇼츠" in selected:
+            filtered_videos = shorts_list
+        else:
+            filtered_videos = recent
+
+        if not filtered_videos:
+            st.info("해당 유형의 영상이 없습니다.")
+        else:
+
+            def _fmt_duration(sec):
+                if sec <= 0:
+                    return "-"
+                m, s = divmod(sec, 60)
+                h, m = divmod(m, 60)
+                return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+
+            vid_html = '<table class="vid-table"><thead><tr><th>#</th><th>제목</th><th>길이</th><th>카테고리</th><th style="text-align:right">조회수</th><th style="text-align:right">좋아요</th></tr></thead><tbody>'
+            for i, v in enumerate(filtered_videos):
+                dur = v.get("duration_seconds", 0)
+                type_badge = '<span style="color:#ff6161;font-size:10px;font-weight:600">⬤ Shorts</span>' if _is_shorts(v) else ""
+                vid_html += f"""<tr>
+                    <td style="color:#536471">{i + 1}</td>
+                    <td class="vid-title">{esc(v['title'])} {type_badge}</td>
+                    <td style="color:#8b98a5;font-size:12px;white-space:nowrap">{_fmt_duration(dur)}</td>
+                    <td style="color:#8b98a5;font-size:12px">{esc(v.get('category_name', ''))}</td>
+                    <td class="vid-stat">{v.get('view_display', '')}</td>
+                    <td class="vid-stat">{v.get('like_display', '')}</td>
+                </tr>"""
+            vid_html += '</tbody></table>'
+            st.markdown(vid_html, unsafe_allow_html=True)
